@@ -1,0 +1,1227 @@
+#' svm / xnum
+#' svm / xcat 2 num
+#' dt  / x
+#' nb  / x
+#' rf  / x
+
+
+
+
+
+
+
+
+
+
+##  cf 
+
+
+## Anomaly Detection
+##   isofor: iForest
+##   e1071: svm with “one-classification” type
+## Clustering
+##   amap: hclust
+##   neighbr: neighbr
+##   stats: kmeans
+## K Nearest Neighbors
+##   neighbr: neighbr
+## Linear Models
+##   glmnet: cv.glmnet with “gaussian” and “poisson” family types
+##   nnet: multinom
+##   stats: glm, lm without interaction terms
+## Naive Bayes
+##   e1071: naiveBayes
+## Neural Networks
+##   nnet: nnet
+## Support Vector Machines
+##   e1071: svm
+##   kernlab: ksvm with “rbfdot”, “polydot”, “vanilladot”, and “tanhdot” kernels
+## Time Series
+##   forecast: Arima
+## Tree-based Models and Ensembles
+##   ada: ada
+##   gbm: gbm with “bernoulli”, “poisson”, and “multinomial” distribution types
+##   randomForest: randomForest
+##   randomForestC (version 2.5.0): randomrvivalForest
+##   rpart: rpart
+##   xgboost: xgb.Booster with “multi:softprob”, “multi:softmax”, and “binary:logistic” objectives
+## Other Packages
+##   arules: rules and itemsets
+##   survival: coxph
+
+
+
+## [1]
+## Data cleansing
+##   Removing or correcting records with corrputed
+##   or invalid values from raw data, as well as
+##   removing records that are missing a large
+##   number of columns
+
+
+## [2]
+## Instances selection and partioning
+##   Selecting data points from the input dataset
+##   to create training, evaluation (validation),
+##   and test sets. This process includes techniques
+##   for repeatable random sampling, minority
+##   classes oversampling, and stratified partitioning
+
+
+#' Create subsets for learning, evaluating or testing
+#' 
+#' @param
+#'   y :character vector; a label is an element of
+#'   a set of length two, e.g. {0, 1}
+#'
+#' @return
+#'   list : with
+#'     $id_train := vector/row index
+#'     $id_eval := vector/row index
+#'     $id_learn := vector/row index
+#'     $reps := 1:nrep
+#'     $nrep := INTEGER
+#' 
+#' @examples
+#'   iris$y = ifelse(iris$Species == "", 1, 0)
+#'   sets = data2sets(iris$y, sample="down")
+#'   train = iris[sets$id_train,]
+#'   model = svm(y ~ ., data=train)
+#'   eval = iris[sets$id_eval,]
+#'   predict(model, newx=eval)
+#'
+#'   ## learn multiple models
+#'   models = lapply(sets$reps, function(r){
+#'     learn = iris[sets$id_learn_[[r]],]
+#'     svm(y ~ ., data=learn)
+#'   })
+#'   ## average models
+#' 
+#' @export
+#'
+data2sets <- function(y, t=NULL, sample="down", split=.5, scale=1, nrep=10){
+    sets = switch(sample,
+                  "down" = { downsample(y, t, split, scale, nrep) },
+                  "up"   = {   upsample(y, t, split, scale, nrep) },
+                  "sub"  = {  subsample(y, t, split, scale, nrep) }
+                  )
+    return(sets)
+}
+
+downsample <- function(y, t=NULL, split=.5, scale=1, nrep=10){
+    if(is.null(t)){
+        sep = as.integer(length(y) * split)
+        id_train = 1:sep
+        id_eval = (sep+1):length(y)
+        y0 = which(y[id_train] == 0)
+        y1 = which(y[id_train] == 1)
+        n1 = length(y1)
+        n0 = as.integer(scale * n1)
+        id_learn = as.data.frame(replicate(nrep,
+                          c(sample(y0, n0),
+                            sample(y1, n1))))
+        reps = 1:nrep
+        colnames(id_learn) = reps
+        n = n0+n1
+        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
+        return(stuff)
+    }else if(sum(class(t) == "POSIXct") > 0){
+        sep = max(which(t == quantile(t, split), arr.ind=T))
+        id_train = 1:sep
+        id_eval = (sep+1):length(y)
+        y0 = which(y[id_train] == 0)
+        y1 = which(y[id_train] == 1)
+        n1 = length(y1)
+        n0 = scale * n1
+        id_learn = as.data.frame(replicate(nrep,
+                          c(sample(y0, n0),
+                            sample(y1, n1))))
+        reps = 1:nrep
+        colnames(id_learn) = reps
+        n = n0+n1
+        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
+        return(stuff)
+    }
+    return(NULL)
+}
+
+upsample <- function(y, t=NULL, split=.5, scale=1, nrep=10){
+    if(is.null(t)){
+        sep = as.integer(length(y) * split)
+        id_train = 1:sep
+        id_eval = (sep+1):length(y)
+        y0 = which(y[id_train] == 0)
+        y1 = which(y[id_train] == 1)
+        n0 = length(y0)
+        n1 = as.integer(scale * n0)
+        id_learn = as.data.frame(replicate(nrep,
+                          c(sample(y0, n0),
+                            sample(y1, n1))))
+        reps = 1:nrep
+        colnames(id_learn) = reps
+        n = n0+n1
+        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
+        return(stuff)
+    }else if(class(t) == "POSIXct"){
+        sep = max(which(t == quantile(t, split), arr.ind=T))
+        id_train = 1:sep
+        id_eval = (sep+1):length(y)
+        y0 = which(y[id_train] == 0)
+        y1 = which(y[id_train] == 1)
+        n0 = length(y0)
+        n1 = scale * n0
+        id_learn = as.data.frame(replicate(nrep,
+                          c(sample(y0, n0),
+                            sample(y1, n1))))
+        reps = 1:nrep
+        colnames(id_learn) = reps
+        n = n0+n1
+        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
+        return(stuff)
+    }
+    return(NULL)
+}
+
+
+subsample <- function(y, t=NULL, split=.5, scale=1, nrep=10){
+    if(is.null(t)){
+        sep = as.integer(length(y) * split)
+        id_train = 1:sep
+        id_eval = (sep+1):length(y)
+        n = as.integer(sep/2)
+        id_learn = as.data.frame(replicate(nrep,
+                                sample(id_train, n)))
+        reps = 1:nrep
+        colnames(id_learn) = reps
+        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n)
+        return(stuff)
+    }else if(class(t) == "POSIXct"){
+        sep = max(which(t == quantile(t, split), arr.ind=T))
+        id_train = 1:sep
+        id_eval = (sep+1):length(y)
+        n = as.integer(sep/2)
+        id_learn = as.data.frame(replicate(nrep,
+                                           sample(id_train, n)))
+        reps = 1:nrep
+        colnames(id_learn) = reps
+        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n)
+        return(stuff)
+    }
+    return(NULL)
+}
+
+
+## [3]
+## Feature tuning
+##   Improving the quality of a feature for ML, which
+##   includes scaling and normalising numeric values,
+##   imputing missing values, clipping outliers, and
+##   adjusting values with skewed distributions
+
+#' Box-Cox transformation
+#'
+#' @param
+#'   x : data.frame
+#'
+#' @return
+#'   num2trafo object
+#' 
+#' @examples
+#'   m = num2trafo(iris[,1:2])
+#'   predict(m, iris[,1:4])
+#' 
+#' @export
+#' 
+num2trafo <- function(x, ...){
+    labs = colnames(x)
+    lut = lapply(labs, function(lab){ car::powerTransform(x[[lab]]) })
+    names(lut) = labs
+    model = list(lut=lut)
+    class(model) = c("num2trafo")
+    return(model)
+}
+
+#' Box-Cox transformation
+#'
+#' @param
+#'   model : num2trafo object
+#'
+#' @param
+#'   newx : data.frame
+#' 
+#' @return
+#'   data.frame;  dim is preserved
+#'
+#' @examples
+#'   m = num2trafo(iris[,1:2])
+#'   predict(m, iris[,1:4])
+#'
+#' @export
+#' 
+predict.num2trafo <- function(model, newx, ...){
+    cols = intersect(colnames(newx), names(model$lut))
+    newx[,cols] = lapply(cols, function(col){
+        car::bcPower(newx[[col]], model$lut[[col]]$lambda)
+    })
+    return(newx)
+}
+
+
+#' Continuous variable scaling
+#'
+#' @param
+#'   x : data.frame with independent variables of type continous
+#'
+#' @param
+#'   method : string = ["minmax", "znorm"]
+#' 
+#' @return
+#'   num2norm object
+#'
+#' @examples
+#'   m = num2norm(iris[,1:2])
+#'   predict(m, iris[,1:4])
+#' 
+#' @export
+#' 
+num2norm <- function(x, method="minmax", ...){
+    labs = colnames(x)
+    lut = lapply(labs, function(lab){ norm(x[[lab]], method, ...) })
+    names(lut) = labs
+    model = list(lut=lut)
+    class(model) = c("num2norm")
+    return(model)
+}                 
+
+norm <- function(X, method="minmax"){
+    v = na.omit(X)
+    list(method=method, min=min(v), max=max(v), mean=mean(v), sd=sd(v))
+}
+
+#' Continuous variable scaling
+#'
+#' @param
+#'   model : num2norm object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame;  dim is preserved
+#'
+#' @examples
+#'   m = num2norm(iris[,1:2])
+#'   predict(m, iris[,1:4])
+#' 
+#' @export
+#' 
+predict.num2norm <- function(model, newx, method=NULL, ...){
+    cols = intersect(colnames(newx), names(model$lut))
+    newx[,cols] = lapply(cols, function(col){
+        vals = model$lut[[col]]
+        switch(ifelse(is.null(method), vals$method, method),
+               minmax = { (newx[[col]]-vals$min)/(vals$max-vals$min) },
+               zscore = { (newx[[col]]-vals$mean)/(vals$sd) }
+               )
+    })
+    return(newx)
+}
+
+
+## [4]
+## Representation transformation
+##   Converting a numeric feature to a categorical
+##   feature (through bucketisation), and converting
+##   categorical features to a numeric representation
+##   (through one-hot encoding, learning with counts,
+##   sparse feature embeddings). Some models work only
+##   with numeric or categorical features, while others
+##   can handle both types, they can benefit from
+##   different representation (numeric and categorical)
+##   of the same feature
+
+#' Data dictionary definition based on input data
+#' 
+#' @param
+#'   x : data.frame with categorical or numerical variables
+#' 
+#' @param
+#'   file : STRING, e.g. "dict.csv"
+#'
+#' @param
+#'   sep : CHAR, default ","
+#'
+#' @return
+#'   data2dict object
+#'
+#'   if file is not null, then a file is created with the columns:-
+#'       var := [x|y|-]
+#'     class := [cat|num]
+#'      name := STRING
+#'
+#' @examples
+#'   dict = data2dict(iris, file="dict.csv")
+#'   ## emacs -nw dict.csv ## edit var=y
+#'   dict = data2dict(file="dict.csv")
+#'   data = predict(dict, iris)
+#'
+#' @export
+#' 
+data2dict <- function(x=NULL, file=NULL, sep=","){
+    if(!is.null(x)){
+        name = colnames(x)
+        class = sapply(name, function(i){ class(x[[i]]) })
+        class = gsub("integer", "num", class)
+        class = gsub("numeric", "num", class)
+        class = gsub("logical", "num", class)
+        class = gsub("character", "cat", class)
+        class = gsub("factor", "cat", class)        
+        var = "x"
+        model = data.frame(var=var, class=class, name=name, stringsAsFactors=F)
+        if(!is.null(file)){
+            write.table(model, file=file, quote=F, sep=sep, row.names=F)
+        }
+        class(model) = c("data2dict")        
+        return(model)
+    }
+    if(is.null(x) && !is.null(file) && file.exists(file)){
+        model = read.table(file, sep=sep, stringsAsFactors=F, header=T)
+        class(model) = c("data2dict")
+        return(model)
+    }
+}
+
+#' Data dictionary applied on input data
+#'
+#' Operations include:-
+#'   - casting x numeric variables
+#'   - casting x categorical variables
+#'   - casting y variable [TODO]
+#'
+#' @param
+#'   model : data2dict object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame;  dim is preserved
+#' 
+#' @examples
+#'   dict = data2dict(iris, file="dict.csv")
+#'   ## emacs -nw dict.csv ## edit var=y
+#'   dict = data2dict(file="dict.csv")
+#'   data = predict(dict, iris)
+#'
+#' @export
+#' 
+predict.data2dict <- function(model, newx, ...){
+    X = dict2x(model, newx)
+    Y = dict2y(model, newx)
+    Xnum = dict2xnum(model, newx)
+    Xcat = dict2xcat(model, newx)
+    newx[,Xnum] = lapply(Xnum, function(i){ as.numeric(newx[[i]]) })
+    newx[,Xcat] = lapply(Xnum, function(i){ as.character(newx[[i]]) })
+    ##--TODO:  cast Y
+    return(newx)
+}
+
+#' Extract x variables
+#'
+#' @param
+#'   model : data2dict object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   character vector
+#' 
+#' @export
+#' 
+dict2x <- function(model, newx, ...){
+    intersect(model$name[model$var == "x"], colnames(newx))
+}
+
+#' Extract y variables
+#'
+#' @param
+#'   model : data2dict object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   character vector
+#' 
+#' @export
+#' 
+dict2y <- function(model, newx, ...){
+    intersect(model$name[model$var == "y"], colnames(newx))
+}
+
+#' Extract numeric x variables
+#'
+#' @param
+#'   model : data2dict object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   character vector
+#' 
+#' @export
+#' 
+dict2xnum <- function(model, newx, ...){
+    intersect(model$name[model$var == "x" & model$class == "num"], colnames(newx))
+}
+
+#' Extract categorical x variables
+#'
+#' @param
+#'   model : data2dict object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   character vector
+#' 
+#' @export
+#' 
+dict2xcat <- function(model, newx, ...){
+    intersect(model$name[model$var == "x" & model$class == "cat"], colnames(newx))
+}
+
+
+#' Create formula from dict
+#'
+#' @param
+#'   model : data2dict object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   formula object
+#'
+#' @export
+#' 
+data2formula <- function(model, newx, varx=NULL, vary=NULL){
+    if(is.null(vary)){
+        id_y = dict2y(model, newx)
+    }else{
+        id_y = vary
+    }
+    if(is.null(varx)){
+        id_x = dict2x(model, newx)
+    }else{
+        switch(varx,
+               "x" = {id_x = dict2x(model, newx)},
+               "xnum" = {id_x = dict2xnum(model, newx)},
+               "xcat" = {id_x = dict2xcat(model, newx)},
+               {id_x = varx}
+               )
+    }
+    s = paste0(id_y, " ~ ")
+    if(length(id_x) > 1){
+        s = paste0(s, paste0(id_x, collapse=" + "))
+    }else if(length(x) == 0){
+        s = paste0(s, id_x)
+    }
+    return(as.formula(s))
+}
+
+
+#' Converts categorical variables to continuous variables
+#'
+#' Based on the mutual information MI(xi, y) each categorical
+#' variable value is represented by its score
+#' 
+#' @param
+#'   x :  data.frame with independent variables of type category
+#' @param
+#'   y : character vector
+#'
+#' @return
+#'   cat2num object
+#'
+#' @examples
+#'   m = cat2num()
+#'   predict(m, )
+#' 
+#' @export
+#' 
+cat2num <- function(x, y, ...){
+    labs = colnames(x)
+    lut = lapply(labs, function(lab){ mi(x[[lab]], y, ...) })
+    names(lut) = labs
+    model = list(lut=lut)
+    class(model) = c("cat2num")
+    return(model)
+}       
+
+## assumes the matrix is like this
+##     y0 y1
+##  x0
+##  x1
+mi <- function(X, Y, smooth=.000001){
+    M = as.matrix(table(X, Y))
+    . = apply(M, 2, sum)
+    .M = t(apply(M, 1, function(x). - x))
+    N11 =  M[,2] + smooth
+    N10 =  M[,1] + smooth
+    N00 = .M[,1] + smooth
+    N01 = .M[,2] + smooth
+    N   = N11 + N10 + N00 + N01
+    N1. = N11 + N10 + smooth
+    N.1 = N11 + N01 + smooth
+    N0. = N01 + N00 + smooth
+    N.0 = N10 + N00 + smooth
+    log2N   = log2(N)
+    log2N11 = log2(N11)
+    log2N1. = log2(N1.)
+    log2N.1 = log2(N.1)   
+    log2N00 = log2(N00)
+    log2N0. = log2(N0.)
+    log2N.0 = log2(N.0) 
+    log2N10 = log2(N10)
+    log2N01 = log2(N01)
+    I = (N11 / N) * (log2N + log2N11 - log2N1. - log2N.1) +
+        (N01 / N) * (log2N + log2N01 - log2N0. - log2N.1) +
+        (N10 / N) * (log2N + log2N10 - log2N1. - log2N.0) +
+        (N00 / N) * (log2N + log2N00 - log2N0. - log2N.0)
+    I[is.na(I)] = 0
+    return(I)
+}
+
+#' Converts categorical variables to continuous variables
+#' 
+#' @param
+#'   model : cat2num object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame;  dim is preserved
+#'
+#' @examples
+#'   m = cat2num()
+#'   predict(m, )
+#' 
+#' @export
+predict.cat2num <- function(model, newx, ...){
+    cols = intersect(colnames(newx),  names(model$lut))
+    newx[,cols] = lapply(cols, function(col){
+        vals = model$lut[[col]]
+        vals[match(newx[[col]], names(vals))]
+    })
+    return(newx)
+}
+
+
+
+
+#' Converts a continuous variable to bins
+#'
+#' @param
+#'   x : ata.frame with independent variables of type continous
+#'
+#' @return
+#'   num2bin object
+#'
+#' @examples
+#'   n = 100
+#'   rows = sample(1:nrow(iris), n)
+#'   train = iris[n,]
+#'   sel = 1:30
+#'   calib = train[sel,]
+#'   learn = train[-sel,]
+#'   m = num2bin(calib[,1:4])
+#'   learn = predict(m, learn)
+#' 
+#' @export
+#' 
+num2bin <- function(x, ...){
+    labs = colnames(x)
+    lut = lapply(labs, function(lab){ tdigest(x[[lab]], ...) })
+    names(lut) = labs
+    model = list(lut=lut)
+    class(model) = c("num2bin")
+    return(model)
+}
+
+tdigest <- function(X, bins = 100, delta = 10){
+    dens = density(X, na.rm=T)
+    csum = cumsum(dens$y)
+    cuts = suppressWarnings(Hmisc::cut2(csum, g=bins, onlycuts=T))
+    step = length(cuts) - 1
+    labs = seq(1/step, 1, 1/step)
+    q = as.numeric(as.character(cut(csum, breaks=cuts, labels=labs)))
+    k = round(delta*((asin(2*q-1)/pi) + .5))
+    df = data.frame(x=dens$x, y=dens$y, csum=csum,q,k)
+    df = aggregate(df, by=list(k), FUN=mean)
+    k = df$k
+    k = c(0, k, delta)
+    names(k) = c(-Inf, df$x, Inf)
+    return(k)
+}      
+
+#' Converts a continuous variable to bins
+#'
+#' @param
+#'   model : num2bin object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame;  dim is preserved
+#' 
+#' @examples
+#'   n = 100
+#'   rows = sample(1:nrow(iris), n)
+#'   train = iris[n,]
+#'   sel = 1:30
+#'   calib = train[sel,]
+#'   learn = train[-sel,]
+#'   m = num2bin(calib[,1:4])
+#'   learn = predict(m, learn)
+#' 
+#' @export
+#' 
+predict.num2bin <- function(model, newx, ...){
+    cols = intersect(colnames(newx),  names(model$lut))
+    newx[,cols] = lapply(cols, function(col){
+        vals = model$lut[[col]]
+        cuts = names(vals)
+        labs = vals[-length(vals)]
+        cut(newx[[col]], breaks=cuts, labels=labs)
+    })
+    return(newx)
+}
+
+
+
+
+## [5]
+## Feature extraction
+##   Reducing the number of features by creating lower-
+##   dimension, more powerful data representations using
+##   techniques such as PCA, embedding extraction, and
+##   hashing
+
+#' PCA based transformation of numerical data
+#'
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @return
+#'   num2pca object
+#'
+#' @examples
+#'   m = num2pca(iris[,1:4])
+#'   predict(m, iris)  ##--TODO
+#' 
+#' @export
+#' 
+num2pca <- function(x, ...){
+    pca = prcomp(x, center=T, scale=T)
+    importance = summary(pca)$importance[3,]
+    model = list(pca=pca, importance=importance)
+    class(model) = c("num2pca")
+    return(model)
+}
+
+predict.num2pca <- function(model, newx, thresh=.95, ...){
+    sel = model$importance <= thresh
+    newx = predict(model$pca, newx)[,sel]
+    return(newx)
+}
+
+
+
+## [6]
+## Feature selection
+##   Selecting a subset of the input features for training
+##   the model, and ignoring the irrelevant or redundant
+##   ones, using filter or wrapper methods. This can also
+##   involve simply dropping features if the features are
+##   missing a large number of values
+
+#' Remove NA variables
+#'
+#' @param
+#'   x : data.frame with categorical or numerical variables
+#'
+#' @param
+#'   thresh : DOUBLE
+#'   IF num_NA / len_var > thresh
+#'   THEN remove
+#'
+#' @examples
+#'   m = na2rm(iris[,1:4])b
+#'   predict(m, iris)
+#' 
+#' @return
+#'   na2rm object
+#'
+#' @export
+#' 
+na2rm <- function(x, thresh=.05){
+    cols = colnames(x)
+    na = sapply(cols, function(xx){        
+        sum(is.na(x[[xx]]))
+    }) / nrow(x)
+    lut = cols[na > thresh]
+    model = list(lut=lut)
+    class(model) = c("na2rm")
+    return(model)
+}
+
+#' Remove NA variables
+#'
+#' @param
+#'   model : na2rm object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @examples
+#'   m = na2rm(iris[,1:4])b
+#'   predict(m, iris)
+#'
+#' @return
+#'   data.frame;  number of columns is reduced
+#'
+#' @export
+#' 
+predict.na2rm <- function(model, newx){
+    newx[, model$lut] = NULL
+    return(newx)
+}
+
+
+#' Remove constant variables
+#'
+#' @param
+#'   x : data.frame with categorical or numerical variables
+#'
+#' @return
+#'   const2rm object
+#'
+#' @examples
+#'   m = const2rm(iris[,1:4])
+#'   predict(m, iris)
+#'
+#' @export
+#' 
+const2rm <- function(x){
+    cols = colnames(x)
+    const = sapply(cols, function(xx){
+        length(unique(x[[xx]]))
+    })
+    lut = cols[const == 1]
+    model = list(lut=lut)
+    class(model) = c("const2rm")
+    return(model)
+}
+
+#' Remove constant variables
+#'
+#' @param
+#'   model : const2rm object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame;  number of columns is reduced
+#'
+#' @examples
+#'   m = const2rm(iris[,1:4])
+#'   predict(m, iris)
+#'
+#' @export
+#' 
+predict.const2rm <- function(model, newx){
+    newx[, model$lut] = NULL
+    return(newx)
+}
+
+#' Remove near zero variance (NZV) variables
+#'
+#' @param
+#'   x : data.frame with numerical variables
+#' 
+#' @param
+#'   ratio : DOUBLE;
+#'   IF num_NA / len_var >= RATIO
+#'   THEN  remove NA
+#' 
+#' @param
+#'   thresh : DOUBLE;
+#'   IF nzv < thresh
+#'   THEN  exclude NZV variables
+#' 
+#' @return
+#'   nzv2rm object
+#'
+#' @examples
+#'   sel = rm_nzv(iris[,1:4])
+#'   learn = iris[,sel]
+#' 
+#' @export
+#' 
+nzv2rm <- function(x, ratio=.5, thresh=.05){
+    cols = colnames(x)
+    nzv = sapply(cols, function(xx){
+        rel = sum(is.na(x[[xx]])) / length(x[[xx]])
+        NA.RM = ifelse(rel >= ratio, T, F)
+        nzv = ifelse(is.numeric(x[[xx]]),
+                     var(x[[xx]], na.rm=NA.RM),
+                     ifelse(length(table(x[[xx]]) > 1, 1, 0))
+                     )
+    })
+    lut = na.omit(cols[nzv < thresh])
+    model = list(lut=lut)
+    class(model) = c("nzv2rm")
+    return(model)
+}
+
+#' Remove near zero variance (NZV) variables
+#'
+#' @param
+#'   model : nzv2rm object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame : number of columns is reduced
+#' 
+#' @examples
+#'   sel = rm_nzv(iris[,1:4])
+#'   learn = iris[,sel]
+#' 
+#' @export
+#' 
+predict.nzv2rm <- function(model, newx){
+    newx[, model$lut] = NULL
+    return(newx)
+}
+
+
+## [7]
+## Feature construction
+##   Creating new features either by using typical techniques,
+##   such as polynomial expansion (by using univariate
+##   mathematical functions), or feature corssing (to
+##   capture feature interactions). Features can also be
+##   constructed by using business logic from the domain
+##   of the ML use case
+
+
+
+#' Calibration of a data.frame
+#'
+#' @param models A list of models
+#' @param append=true Boolean indicating if the output of each model should be appended to the right of the data.frame
+#'   If append=false the operation of each model is on the output of the previous one.
+#' @return A calibrated data.frame
+#'
+#' @examples
+#'   n = 100
+#'   rows = sample(1:nrow(iris), n)
+#'   train = iris[n,]
+#'   sel = 1:30
+#'   calib = train[sel,]
+#'   learn = train[-sel,]
+#'   m1 = conti2bins(calib[,1:4])
+#'   m2 = conti2norm(calib[,1:4])
+#'   M = list()
+#'   M[1] = m1
+#'   M[2] = m2
+#'   learn = calib(learn, M, append=T)
+#'
+
+calib <- function(x, models=list(0), append=T){
+    if(append){
+        out = list()
+        iter = 1:length(models)
+        out[[iter]] = sapply(iter, function(i){
+            model = models[[i]]
+            predict(x, model)
+        })
+    }else{
+    }
+}
+
+
+
+
+
+
+###############################################################
+
+
+
+
+
+#' Clustering by committee
+#'
+#' @param x A data.frame with independent variables of type continous
+#' @param top A subset of highly similar entries from which the initial cluster is built
+#' @param theta1 Similarity threshold between centroids of clusters
+#' @param theta2 Similarity threshold between an observation and a committee
+#' @param method Similarity metric available from the "proxy" package:
+#'   "Jaccard"
+#'   "Kulczynski1" "Kulczynski2"
+#'   "Mountford"
+#'   "Fager"
+#'   "Russel"
+#'   "simple matching"
+#'   "Hamman"
+#'   "Faith"
+#'   "Tanimoto"
+#'   "Dice"
+#'   "Phi"
+#'   "Stiles"
+#'   "Michael"
+#'   "Mozley"
+#'   "Yule" "Yule2"
+#'   "Ochiai"
+#'   "Simpson"
+#'   "Braun-Blanquet"
+#'   "cosine"
+#'   "eJaccard" "fJaccard"
+#'   "correlation"
+#'   "Chi-squared"
+#'   "Phi-squared"
+#'   "Tschuprow"
+#'   "Cramer"
+#'   "Pearson"
+#'   "Gower"
+#'   "Euclidean"
+#'   "Mahalanobis"
+#'   "Bhjattacharyya"
+#'   "Manhattan"
+#'   "supremum"
+#'   "Minkowski"
+#'   "Canberra"
+#'   "Wave"
+#'   "divergence"
+#'   "Kullback"
+#'   "Bray"
+#'   "Soergel"
+#'   "Levenshtein"
+#'   "Podani"
+#'   "Chord"
+#'   "Geodesic"
+#'   "Whittaker"
+#'   "Hellinger"   
+#' 
+#' @return A model to predict cluster
+#'
+#' @examples
+#'   n = 100
+#'   rows = sample(1:nrow(iris), n)
+#'   train = iris[n,]
+#'   test = iris[-rows,]
+#'   m = cbc(train[,1:4])
+#'   p = predict(m, test)
+#' 
+#' @export                 
+cbc <- function(x, top=50, theta1=.35, theta2=.25, method="Euclidean", lim=nrow(x)/2){
+    ## Input:  A list of elements E to be clustered, a similarity database S
+    ##   from Phase 1, threhsolds theta1, theta2
+    E = x
+    C = list()
+    iter = 0
+    nrow.E.last = 0
+    while(nrow(E) > 0 && iter < lim){
+                                        #    while(iter < 1){
+        ## step 1:  For each element e elem E
+        ##   Cluster the top similar elements of e from S using average-link
+        ##   clustering
+        ##   For each discovered cluster c, compute the following score:
+        ##   |c| x avgsim(c), where |c| is the number of elements in c and
+        ##   avgsim(c) is the average pairwise similarity between elements in c.
+        ##   Store the highest scoring cluster in a list L.
+        
+        
+        data.table::setorderv(E)     
+        S = head(E, top)
+        ##        S = E[sample(1:nrow(E), ifelse(top>=nrow(E),nrow(E), top)), ]
+        
+        hc = cutree(hclust(proxy::as.dist(proxy::simil(S)), method="ave"), k=1:nrow(S))
+        
+        print(hc)
+        
+        hc.scores = apply(hc, 2, function(k){
+            uniq = unique(k)
+            score = sapply(uniq, function(k.){
+                c = S[k == k.,]
+                len.c = nrow(c)      
+                d = as.matrix(proxy::simil(c, method=method))
+                avgsim.c = mean(d[lower.tri(d)])                         
+                len.c * avgsim.c
+            })
+            score[match(k, uniq)]
+        })
+        
+        print(hc.scores)
+        
+        ## step 2:  Sort the clusters in L in descending order of their scores
+        ##---  TODO
+        best = which(hc.scores == max(hc.scores, na.rm = T), arr.ind=T)[1,]
+        row = best[1]
+        col = best[2]
+        sel = (hc[,col] == hc[row,col])
+        
+        L = list()
+        L[[(length(L)+1)]] = S[sel,]
+        
+        ## step 3:  Let C be a list of committees, initially empty.
+        ##   For each cluster c elem L in sorted order
+        ##   Compute the centroid of c by averaging the feature vectors of its
+        ##   elements and computing the mutual information scores in the same
+        ##   way as we did for individual elements.
+        ##   If c's similarity to the centroid of each committee previously added
+        ##   to C is below a threshold theta1, add c to C.
+        tmp = lapply(1:length(L), function(i){
+            l = L[[i]]
+            cen.l = apply(l, 2, mean)
+            if(length(C) > 0){
+                censim = max(sapply(1:length(C), function(j){
+                    c = C[[j]]
+                    cen.c = apply(c, 2, mean)
+                    v = proxy::simil(x=cen.l, y=cen.c, method=method)
+                    ifelse(is.nan(v), 0, v)
+                }))
+                print(paste0("  censim: ", censim))
+                
+                if(censim < theta1){
+                    C[[(length(C)+1)]] <<- l
+                }            
+            }else{
+                C[[(length(C)+1)]] <<- l
+            }
+            NULL
+        })
+        ## step 4:  If C is empty, we are done and return C.
+        model = list(C=C, method=method)
+        class(model) = "cbc"   
+
+        ## step 5:  For each element e elem E
+        ##   If e's similarity to every committee in C is below threshold theta2, add
+        ##   e to a list of residues R
+        p = predict.cbc(model, x, theta2)
+        
+        ee = x
+        ee$p = as.character(p)
+        pp = ggplot(ee, aes(Petal.Length, Petal.Width, color=p)) + geom_point(data=C[[length(C)]], aes(Petal.Length, Petal.Width), color="black", size=5, alpha=.2)+ geom_point() 
+        print(pp)
+        ## step 6:  If R is empty, we are done and return C.
+        ##   Otherwise, return the union of C and the output of a recursive call
+        ##   to Phase II using the same input except replacing E with R
+        R = x[is.na(p),]
+        E = R        
+        iter = iter + 1
+    }
+    
+    model = list(C=C, R=R, iter=iter, L=L, p=p, method=method, E=E, p=p)
+    class(model) = "cbc"  
+    return(model)
+}
+
+
+#' @export
+predict.cbc <- function(model, newx, theta2=.50){
+    if(class(newx) == "data.frame"){
+        sapply(1:nrow(newx), function(ii){
+            e = newx[ii,]
+            sim = sapply(1:length(model$C), function(i){
+                c = model$C[[i]]
+                df = rbind(e, c)
+                mat = as.matrix(proxy::simil(df, method=model$method))
+                max(mat[1,-1])
+            })
+            hit = as.character(which(sim > theta2, arr.ind = T))
+            label = ifelse(length(hit)>0, hit[1], NA)
+            label
+        })
+    }
+}
+
+
+
+
+
+
+
+## find cluster/cliques in graph
+
+
+
+#' Extract time related features
+#'
+#' @param x A vector with timestamps of type POSIXct
+#' @param y A vector with group label
+#'
+#' @return A data.frame with features
+#'
+#' @export
+tfeat <- function(x, width){
+    WOD = as.numeric(format(x, "%w")) + 1
+    DOM = as.numeric(format(x, "%d"))
+    HOD = as.numeric(format(x, "%H"))
+    WOD. = zoo::rollapply(c(rep(NA, (width-1)), WOD), width, function(xx){
+                    min = min(xx)
+                    max = max(xx)
+                    diff = diff(xx, lag=1)
+                    mean = mean(diff)
+                    median = median(diff)
+                    var = var(diff)
+                    minmax = diff(range(xx))
+                    delta = tail(xx, 1) - head(xx, 1)
+                })
+    colnames(WOD.) = paste0("WOD.", width, ".", colnames(WOD.))
+
+    DOM. = zoo::rollapply(c(rep(NA, (width-1)), DOM), width, function(xx){
+                    min = min(xx)
+                    max = max(xx)
+                    diff = diff(xx, lag=1)
+                    mean = mean(diff)
+                    median = median(diff)
+                    var = var(diff)
+                    minmax = diff(range(xx))
+                    delta = tail(xx, 1) - head(xx, 1)
+                })
+    colnames(DOM.) = paste0("DOM.", width, ".", colnames(DOM.))
+    
+    HOD. = zoo::rollapply(c(rep(NA, (width-1)), HOD), width, function(xx){
+                    min = min(xx)
+                    max = max(xx)
+                    diff = diff(xx, lag=1)
+                    mean = mean(diff)
+                    median = median(diff)
+                    var = var(diff)
+                    minmax = diff(range(xx))
+                    delta = tail(xx, 1) - head(xx, 1)
+                    c(min, max, mean, median, var, minmax, delta)
+                })
+    colnames(HOD.) = paste0("HOD.", width, ".", colnames(HOD.))
+
+    x. = zoo::rollapply(c(rep(NA, (width-1)), x), width, function(xx){
+                  diffhours = difftime(xx, lag(xx), units="hours")
+                  diffdays = difftime(xx, lag(xx), units="days")
+                  c(diffhours, diffdays)
+              })
+    colnames(x.) = paste0("DTS.", width, ".", colnames(x.))
+    data.frame(WOD, DOM, HOD, WOD., DOM., HOD., x.)
+}
+
+

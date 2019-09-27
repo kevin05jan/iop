@@ -1,0 +1,232 @@
+Entity features (efeat)
+- categ to num
+- num to bin
+- timestamp to weekdays, day of month, month of year, hour of day
+- momenst (mean, median, (e1071::)kth-moment, var, skewness, kurtosis) // rolling opeartion
+
+attributes of a person
+> primarily cash/credit
+> geographic identity
+> social identity (what kind of spending, grocery)
+> ingress/egress (how much flow in/out)
+> interactions (with whom, diff time scale)
+> operational window (time diff between ingress/egress, how long egress)
+> volume (amount of money flow)
+> volume rate (per day, week, month)
+> past triggers 
+
+
+suspicious people, leat to suspicious interactions
+attributes of an interaction
+> age
+> loyalty
+> periodicity
+> seasonality
+> interaction rate
+> volume
+> system interaction (how many diff ppl, how interact, how often)
+
+
+suspicious interactions lead to suspicious network paths, plains
+> convergent? divergent?
+> periodicity
+> active time
+> lock level
+> recent change in behaviour?
+> last egress point?
+> pass thru to origin ratio
+
+
+
+
+
+  
+Relational features (rfeat)
+- edge between pairs of IV EBImage::filter2()
+- interaction between DV~IV (MI)
+- interaction betweeen IVs (cor)
+
+  
+Network features (nfeat)
+
+
+
+
+  
+# read data
+
+# convert cat to num
+# convert num to bin
+
+
+  
+# split data
+# learn DT model
+# learn NB model for each DT leave
+
+# k means
+# label with centroid categories
+# learn DT model
+
+
+
+
+
+
+
+
+
+
+  
+cloud computing
+python
+elasticsearch / document based database
+generic gui / code factored by gui definition
+business // dev own analysis tool w/ visualisation
+
+  aml
+  - network
+  - semantic in target transfer account / destination
+  - classify KB-based outcome (SAR = suspicious activity report)
+  - ml score for prob of SAR
+
+
+  
+  ML Framework
+
+  - project management
+
+  - prep data
+
+  - feature selection
+
+  - eval model
+
+  - hyperparam tuning
+
+  - imbalance data
+
+  - build ml pipelines
+
+
+  ML models
+
+   - naive bayes
+
+   - logistic regression
+
+   - decision trees
+
+   - k nn
+
+   - svm
+
+   - random forests
+
+   - boosted trees
+
+
+  - regression
+
+   - linear
+
+   - polynomial
+
+   - decision trees
+
+   - k nn
+
+   - random forests
+
+   - boosted trees
+
+   - gaussian process regression
+
+
+  - clustering
+
+   - k means
+
+   - soft clustering w/ gaussian mix models
+
+   - density based spatial clustering of apps with noise
+
+
+  dimensionality reduction
+
+  - pca
+
+  - autoencoders
+
+  - t sne
+
+
+  ML apps
+
+  - NLP
+
+
+  Data Visualisation
+
+
+
+
+ML Framework / Project Management
+  - Specification Document
+    - Requirement:  why does it hurt?
+    - Specific Requirement:  how does it hurt?
+    - Options:  which cure is available
+    - Pros/Cons:  how effective is the cure? / what are the side effects?
+  - Work Strategy
+    - #iteration
+    - Topic
+    - TODOs
+    - Done
+    - Responsible
+    - Deadline
+
+
+ML Framework / Preparing Data
+  - data.csv = raw data
+  - data.rds = binarised data
+  - dict.csv = data dictionary
+    - variable:  [x,y,-]
+    - class:  [continuous,categorical]
+    - name:  STRING
+  - Xnum -> Xbin
+  - Y -> Ysvm [-1, 1]
+  - X -> Xz [x-mean / sd]
+  - X -> Xn [x-min / max-min]
+  - var(Xnum_i) > .05
+  - |cor(Xnum_i, Xnum)j)| < .95
+  - div(Xcat_i) > ttt
+  - pca(Xnum) -> PC1, PC2, PC3
+  - PLS(Xnum, Y) -> comp1, comp2, comp3
+  - tSNE ???
+
+ML Frame
+
+ML Framework / Evaluate Model
+  - Regression
+    model = learn(Y ~ ., data=train)
+    val.train = predict(model, data=train)
+    val.test = predict(model, data=test)
+    lm(p ~ a, data=data.frame(p=val.train, a=train[[Y]]))
+    lm(p ~ a, data=data.frame(p=val.test, a=test[[Y]]))
+    rbind(
+      cbind(p=val.train, l=rep("train", nrow(train))),
+      cbind(p=val.train, l=rep("test", nrow(test)))
+    ) %>% ggplot(aes(p, a)) + geom_point() + geom_abline(slope=1)
+  
+  - Classification
+    model = learn(Y ~ ., data=train)
+    val.train = predict(model, data=train)
+    val.test = predict(model, data=test)
+    rbind(
+      cbind(p=val.train, l=rep("train", nrow(train))),
+      cbind(p=val.train, l=rep("test", nrow(test)))
+    ) %>% 
+    group_by(l,p,a) %>% summarise(n=n()) %>% mutate(p.count=sum(n),prop=n/p.count) %>% ungroup %>%
+    ggplot(aes(p,prop,fill=a, width=p.count)) + geom_bar(stat="identity",position="fill", color="white") +
+    facet_grid(l~p, scales="free_x", space="free_x") + theme_void()
+  
