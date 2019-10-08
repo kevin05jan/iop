@@ -5,7 +5,7 @@
 \title{Create subsets for learning, evaluating or testing}
 \usage{
 data2sets(y, t = NULL, sample = "down", split = 0.5, scale = 1,
-  nrep = 10)
+  nquant = 2, nrep = 11)
 }
 \arguments{
 \item{y}{:character vector; a label is an element of

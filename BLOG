@@ -1,3 +1,30 @@
+| base | dplyr                      | data.table                                        |
+|      |                            |                                                   |
+|      | iris %>%                   | as.data.table(iris)[, list(total=.N), by=Species] |
+|      | group_by(Species) %>%      |                                                   |
+|      | mutate(n=n()) %>%          |                                                   |
+|      | ungroup                    |                                                   |
+|      |                            |                                                   |
+|      |                            |                                                   |
+|      |                            |                                                   |
+|      | iris %>%                   |                                                   |
+|      | group_by(Species) %>%      | as.data.table(iris)[, .SD, by=Species]            |
+|      | do({ data.frame(.) } ) %>% |sss                                                |
+|      | ungroup                    |                                                   |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Entity features (efeat)
 - categ to num
 - num to bin
@@ -35,9 +62,6 @@ suspicious interactions lead to suspicious network paths, plains
 > recent change in behaviour?
 > last egress point?
 > pass thru to origin ratio
-
-
-
 
 
   

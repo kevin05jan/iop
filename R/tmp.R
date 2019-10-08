@@ -1,51 +1,203 @@
-#' svm / xnum
-#' svm / xcat 2 num
-#' dt  / x
-#' nb  / x
-#' rf  / x
+
+### TODO
+### dict2xnum : extract based on current variable classes
+### dict2xcat : extract based on current variable classes
 
 
 
 
 
+#' Anomaly Detection:  isofor: iForest
+#'
+#' @examples
+#'   m = data2isofor(iris[,1:4])
+#'   p = predict(p, iris)
+#' 
+#' @export
+#'
+data2isof <- function(x, ...){
+    isofor::iForest(X=x, 10, 32, ...)
+}
+
+#' Anomaly Detection:   e1071: svm with “one-classification” type
+#'
+#' @examples
+#'   m = data2svm1(Species ~ ., iris)
+#'   predict(m, iris)
+#' 
+#' @export
+#'
+data2svm1 <- function(f, x, ...){
+    m = e1071::svm(x=train, type="one-classification", kernel="linear", nu=.1, ...)
+}
+
+## Clustering:  amap::hclust
+## Clustering:  neighbr::neighbr
+## Clustering:  stats::kmeans
+
+
+## K Nearest Neighbors:  neighbr::knn
+
+
+## Linear Models:  glmnet::cv.glmnet with gaussian and poisson family types
+## Linear Models:  nnet::multinom
+## Linear Models:  stats::glmn without interaction terms
+
+
+#' Naive Bayes:   e1071: naiveBayes
+#'
+#' @examples
+#'   iris[["Species"]] = as.factor(iris[["Species"]])
+#'   m = data2nb(Species ~ ., iris)
+#'   predict(m, newdata=iris, type="class")
+#' 
+#' @export
+#' 
+data2nb <- function(f, x, ...){
+    e1071::naiveBayes(f, x, ...)
+}
+
+
+#' Neural Networks:  nnet::nnet
+#'
+#' @examples
+#'   m = data2nnet(Species ~ ., iris)
+#'   predict(m, iris)
+#' 
+#' @export
+#'
+data2nnet <- function(f, x, ...){
+    nnet::nnet(f, data=x,size=10)
+}
 
 
 
+#' Support Vector Machines:  e1071::svm
+#'
+#' @param
+#'   f : formula
+#'
+#' @param
+#'   x : data.frame
+#'
+#' @examples
+#'   X = 1:2
+#'   Y = 5
+#'   iris[["Species"]] = as.factor(iris[["Species"]])
+#'   svm = e1071::svm(Species ~ ., data=iris[,c(Y, X)])
+#'   p = predict(svm, newdata=iris[,X])##--important
+#'   table(p, a=iris[["Species"]])
+#' 
+#' @export
+#' 
+data2svm <- function(f, x){
+    m = e1071::svm(f, data=x)
+}
 
 
-##  cf 
+#' Support Vector Machines: kernlab::ksvm with rbfdot, polydot, ..., kernels
+#'
+#' @param
+#'   f : formula
+#'
+#' @param
+#'   x : data.frame
+#'
+#' @examples
+#'   ksvm = kernlab::ksvm(Species ~ ., data=iris)
+#'   p = predict(ksvm, newx=iris)
+#'   table(p, a=iris[["Species"]])
+#' 
+#' @export
+#' 
+data2kernlab <- function(f, x){
+    m = kernlab::ksvm(formula, data=train, kernel="rbfdot")
+}
 
 
-## Anomaly Detection
-##   isofor: iForest
-##   e1071: svm with “one-classification” type
-## Clustering
-##   amap: hclust
-##   neighbr: neighbr
-##   stats: kmeans
-## K Nearest Neighbors
-##   neighbr: neighbr
-## Linear Models
-##   glmnet: cv.glmnet with “gaussian” and “poisson” family types
-##   nnet: multinom
-##   stats: glm, lm without interaction terms
-## Naive Bayes
-##   e1071: naiveBayes
-## Neural Networks
-##   nnet: nnet
-## Support Vector Machines
-##   e1071: svm
-##   kernlab: ksvm with “rbfdot”, “polydot”, “vanilladot”, and “tanhdot” kernels
 ## Time Series
 ##   forecast: Arima
-## Tree-based Models and Ensembles
-##   ada: ada
-##   gbm: gbm with “bernoulli”, “poisson”, and “multinomial” distribution types
-##   randomForest: randomForest
-##   randomForestC (version 2.5.0): randomrvivalForest
-##   rpart: rpart
-##   xgboost: xgb.Booster with “multi:softprob”, “multi:softmax”, and “binary:logistic” objectives
-## Other Packages
+
+
+## Tree-based Models and Ensembles:  ada::ada
+## Tree-based Models and Ensembles:  gbm::gbm with bernoulli, poisson, multinomial” distribution types
+
+
+#' Tree-based models and ensembles:  randomForest::randomForest
+#'
+#' @param
+#'   f : formula
+#'
+#' @param
+#'   x : data.frame
+#' 
+#' @examples
+#'   iris[["Species"]] = as.factor(iris[["Species"]])
+#'   dt = randomForest::randomForest(Species ~ ., data=iris)
+#'   p = predict(dt, newdata=iris)
+#'   table(p, a=iris[["Species"]])
+#' 
+#' @export
+#'
+data2rf <- function(f, x){
+    m = randomForest::randomForest(f, x, ntree=10)
+}
+
+
+#' Tree-based models and ensembles:  rpart::rpart
+#'
+#' methods to deal with imbalanced data
+#' (a) prior:  proprotion of 1/0 labels:
+#'   rpart(..., params=list(prior=c(.5, .5))
+#' (b) cost/loss: cost sensitive training/loss learning:  employs cost in misclassification learning
+#'
+#'                   TP  FP
+#'                   FN  TN
+#' 
+#' 
+#'   loss = matrix(c( 0,  1,
+#'                   20,  0), ncol=2)
+#'   rpart(..., params=list(loss=loss))
+#'  (c) case weight: increase case weight for samples of minority class: applies to observation
+#' 
+#' 
+#'
+#' 
+#' @param
+#'   f : formula
+#'
+#' @param
+#'   x : data.frame
+#' 
+#' @examples
+#'   dt = rpart::rpart(f, data=x)
+#'   p = predict(dt, newdata=iris, type="class")
+#'   table(p, a=iris[["Species"]])
+#' 
+#' @export
+#'
+data2dt <- function(f, x, ...){
+    rpart::rpart(f, data=x, ...)
+}
+
+
+#' Tree-based models and ensembles:  xgboost::xgb.Booster  with multi:softprob, multi:softmax, and binary:logistic objectives
+#'
+#' @examples
+#'   iris[["Species"]] = as.character(iris[["Species"]])
+#'   xgb = data2xgb(Species ~ ., iris, iris[["Species"]]
+#'   p = predict(xgb, iris)
+#'   table(p, a=iris[["Species"]]
+#' 
+#' @export
+#' 
+data2xbg <- function(f, x, y){
+    label = y
+    matrix = Matrix::sparse.model.matrix(f, data=x)
+    xgboost::xgboost(data = matrix, label = label, max.depth = 2, eta = 1, nthread = 2, nrounds = 2, objective = "binary:logistic")
+}
+
+
 ##   arules: rules and itemsets
 ##   survival: coxph
 
@@ -99,115 +251,130 @@
 #' 
 #' @export
 #'
-data2sets <- function(y, t=NULL, sample="down", split=.5, scale=1, nrep=10){
+data2sets <- function(y, t=NULL, sample="down", split=.5, scale=1, nquant=5, nrep=11){
     sets = switch(sample,
-                  "down" = { downsample(y, t, split, scale, nrep) },
-                  "up"   = {   upsample(y, t, split, scale, nrep) },
-                  "sub"  = {  subsample(y, t, split, scale, nrep) }
+                  "down" = { downsample(y, t, split, scale, nquant, nrep) },
+                  "up"   = {   upsample(y, t, split, scale, nquant, nrep) },
+                  "sub"  = {  subsample(y, t, split, scale, nquant, nrep) }
                   )
     return(sets)
 }
 
-downsample <- function(y, t=NULL, split=.5, scale=1, nrep=10){
+downsample <- function(y, t=NULL, split=.5, scale=1, nquant=5, nrep=11){
     if(is.null(t)){
-        sep = as.integer(length(y) * split)
-        id_train = 1:sep
-        id_eval = (sep+1):length(y)
-        y0 = which(y[id_train] == 0)
-        y1 = which(y[id_train] == 1)
+        t = 1:length(y)
+    }
+    sep = as.integer(length(y) * split)
+    id_train = 1:sep
+    id_eval = (sep+1):length(y)
+    bin = seq(0, 1, 1/nquant)
+    q = as.integer(quantile(t[id_train], bin))
+    quants = 1:(length(q)-1)
+    quant = list(nquant)
+    quant[quants] = lapply(quants, function(i){
+        id = q[i] <= t & t < q[i+1]+1
+        y0 = which(y[id] == 0)
+        y1 = which(y[id] == 1)
         n1 = length(y1)
         n0 = as.integer(scale * n1)
-        id_learn = as.data.frame(replicate(nrep,
-                          c(sample(y0, n0),
-                            sample(y1, n1))))
+        rep = list(nrep)
         reps = 1:nrep
-        colnames(id_learn) = reps
-        n = n0+n1
-        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
-        return(stuff)
-    }else if(sum(class(t) == "POSIXct") > 0){
-        sep = max(which(t == quantile(t, split), arr.ind=T))
-        id_train = 1:sep
-        id_eval = (sep+1):length(y)
-        y0 = which(y[id_train] == 0)
-        y1 = which(y[id_train] == 1)
-        n1 = length(y1)
-        n0 = scale * n1
-        id_learn = as.data.frame(replicate(nrep,
-                          c(sample(y0, n0),
-                            sample(y1, n1))))
-        reps = 1:nrep
-        colnames(id_learn) = reps
-        n = n0+n1
-        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
-        return(stuff)
-    }
-    return(NULL)
+        rep[reps] = lapply(reps, function(j){
+            c(sample(y0, n0, T),
+              sample(y1, n1))
+        })
+        names(rep) = sprintf("r%03d", reps)
+        rep
+    })
+    id_target
+    names(quant) = sprintf("q%03d", quants)
+    lut = list(id_train=id_train,
+               id_eval=id_eval,
+               id_learn=quant,
+               t = t,
+               sep=sep,
+               scale=scale,
+               nquant=nquant,
+               bin = bin,
+               q = q,
+               nrep=nrep)
+    return(lut)
 }
 
-upsample <- function(y, t=NULL, split=.5, scale=1, nrep=10){
+upsample <- function(y, t=NULL, split=.5, scale=1, nquant=5, nrep=11){
     if(is.null(t)){
-        sep = as.integer(length(y) * split)
-        id_train = 1:sep
-        id_eval = (sep+1):length(y)
-        y0 = which(y[id_train] == 0)
-        y1 = which(y[id_train] == 1)
+        t = 1:length(y)
+    }
+    sep = as.integer(length(y) * split)
+    id_train = 1:sep
+    id_eval = (sep+1):length(y)
+    bin = seq(0, 1, 1/nquant)
+    q = as.integer(quantile(t[id_train], bin))
+    quants = 1:(length(q)-1)
+    quant = list(nquant)
+    quant[quants] = lapply(quants, function(i){
+        id = q[i] <= t & t < q[i+1]+1
+        y0 = which(y[id] == 0)
+        y1 = which(y[id] == 1)
         n0 = length(y0)
         n1 = as.integer(scale * n0)
-        id_learn = as.data.frame(replicate(nrep,
-                          c(sample(y0, n0),
-                            sample(y1, n1))))
+        rep = list(nrep)
         reps = 1:nrep
-        colnames(id_learn) = reps
-        n = n0+n1
-        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
-        return(stuff)
-    }else if(class(t) == "POSIXct"){
-        sep = max(which(t == quantile(t, split), arr.ind=T))
-        id_train = 1:sep
-        id_eval = (sep+1):length(y)
-        y0 = which(y[id_train] == 0)
-        y1 = which(y[id_train] == 1)
-        n0 = length(y0)
-        n1 = scale * n0
-        id_learn = as.data.frame(replicate(nrep,
-                          c(sample(y0, n0),
-                            sample(y1, n1))))
-        reps = 1:nrep
-        colnames(id_learn) = reps
-        n = n0+n1
-        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n, n0=n0, n1=n1)
-        return(stuff)
-    }
-    return(NULL)
+        rep[reps] = lapply(reps, function(j){
+            c(sample(y0, n0),
+              sample(y1, n1, T))
+        })
+        names(rep) = sprintf("r%03d", reps)
+        rep
+    })
+    names(quant) = sprintf("q%03d", quants)
+    lut = list(id_train=id_train,
+               id_eval=id_eval,
+               id_learn=quant,
+               t = t,
+               sep=sep,
+               scale=scale,
+               nquant=nquant,
+               bin = bin,
+               q = q,
+               nrep=nrep)
+    return(lut)
 }
 
 
-subsample <- function(y, t=NULL, split=.5, scale=1, nrep=10){
+subsample <- function(y, t=NULL, split=.5, scale=1, nquant=2, nrep=11){
     if(is.null(t)){
-        sep = as.integer(length(y) * split)
-        id_train = 1:sep
-        id_eval = (sep+1):length(y)
-        n = as.integer(sep/2)
-        id_learn = as.data.frame(replicate(nrep,
-                                sample(id_train, n)))
-        reps = 1:nrep
-        colnames(id_learn) = reps
-        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n)
-        return(stuff)
-    }else if(class(t) == "POSIXct"){
-        sep = max(which(t == quantile(t, split), arr.ind=T))
-        id_train = 1:sep
-        id_eval = (sep+1):length(y)
-        n = as.integer(sep/2)
-        id_learn = as.data.frame(replicate(nrep,
-                                           sample(id_train, n)))
-        reps = 1:nrep
-        colnames(id_learn) = reps
-        stuff = list(id_train=id_train, id_eval=id_eval, id_learn=id_learn, sep=sep, reps=reps, nrep=nrep, n=n)
-        return(stuff)
+        t = 1:length(y)
     }
-    return(NULL)
+    sep = as.integer(length(y) * split)
+    id_train = 1:sep
+    id_eval = (sep+1):length(y)
+    bin = seq(0, 1, 1/nquant)
+    q = as.integer(quantile(t[id_train], bin))
+    quants = 1:(length(q)-1)
+    quant = list(nquant)
+    quant[quants] = lapply(quants, function(i){
+        id = q[i] <= t & t < q[i+1]+1
+        n = as.integer(length(id)/2)
+        reps = 1:nrep
+        rep[reps] = lapply(reps, function(j){
+            sample(id, n)
+        })
+        names(rep) = sprintf("r%03d", reps)
+        rep
+    })
+    names(quant) = sprintf("q%03d", quants)
+    lut = list(id_train=id_train,
+               id_eval=id_eval,
+               id_learn=quant,
+               t = t,
+               sep=sep,
+               scale=scale,
+               nquant=nquant,
+               bin = bin,
+               q = q,
+               nrep=nrep)
+    return(lut)
 }
 
 
@@ -532,6 +699,40 @@ data2formula <- function(model, newx, varx=NULL, vary=NULL){
     }
     return(as.formula(s))
 }
+
+
+
+num2interaction <- function(x, ...){
+    labs = colnames(x)
+    comb = combn(labs,m=2)
+    combs = 1:ncol(comb)
+    newx = list()
+    newx[combs] = lapply(combs, function(i){
+        a = comb[1,i]
+        b = comb[2,i]
+        x[[a]] * x[[b]]
+    })
+    name = sapply(combs, function(i){
+        a = comb[1,i]
+        b = comb[2,i]
+        paste0(a,"_x_",b)
+    })
+    return(as.data.frame(newx, col.names=name))
+}
+
+
+
+
+num2interactionT <- function(x, t, ...){
+    labs = colnames(x)
+    newx = list()
+    newx[labs] = lapply(labs, function(i){
+        t * x[[i]]
+    })
+    name = paste0("t_x_",labs)
+    return(as.data.frame(newx, col.names=name))
+}
+
 
 
 #' Converts categorical variables to continuous variables
@@ -914,6 +1115,61 @@ predict.nzv2rm <- function(model, newx){
 }
 
 
+#' Remove correlating variables
+#'
+#' @param
+#'   x : data.frame with numeric variables
+#'
+#' @param
+#'   thresh : DOUBLE;
+#'   IF cor > thresh
+#'   THEN exclude variable
+#'
+#' @return
+#'   cor2rm object
+#'
+#' @examples
+#'   m = cor2rm(iris[,1:4])
+#'   predict(m, iris)
+#'
+#' @export
+#' 
+cor2rm <- function(x, thresh=.95){
+    cols = colnames(x)
+    tmp = cor(x[,cols], use="complete.obs")
+    tmp[upper.tri(tmp)] = 0
+    diag(tmp) = 0
+    lut = cols[apply(tmp, 2, function(xx){ any(xx > thresh) })]
+    model = list(lut=lut)
+    class(model) = c("cor2rm")
+    return(model)
+}
+
+#' Remove correlating variables
+#'
+#' @param
+#'   model : cor2rm object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @return
+#'   data.frame : number of columns is reduced
+#'
+#' @examples
+#'   m = cor2rm(iris[,1:4])
+#'   predict(m, iris)
+#'
+#' @export
+#' 
+predict.cor2rm <- function(model, newx){
+    newx[, model$lut] = NULL
+    return(newx)
+}
+
+
+
+
 ## [7]
 ## Feature construction
 ##   Creating new features either by using typical techniques,
@@ -923,6 +1179,22 @@ predict.nzv2rm <- function(model, newx){
 ##   constructed by using business logic from the domain
 ##   of the ML use case
 
+#' @export
+data2prep <- function(x){
+    model = x
+    class(model) = c("data2prep")
+    return(model)
+}
+
+#' @export
+predict.data2prep <- function(model, newx){
+    nmod = length(model)
+    x = newx
+    for(i in 1:length(model)){
+        x <<- predict(model[[i]], x)
+    }
+    return(x)
+}
 
 
 #' Calibration of a data.frame
@@ -1166,6 +1438,62 @@ predict.cbc <- function(model, newx, theta2=.50){
 
 
 
+#' Extract profile information from numerical variables
+#' 
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @param
+#'   group : a vector with group variable
+#'
+#' @param
+#'   width : INTEGER,  window for rollapply operation
+#'
+#' @param
+#'   lag : INTEGER,  used to compute the normalised difference index
+#'   of n and r = lag(n, k)
+#'
+#' @return
+#'   a data.frame with
+#'   z
+#'   min
+#'   max
+#'   median
+#'   ndi
+#' 
+#' @examples
+#'   df = num2profile(iris[,1:4], iris[["Species"]], width=10)
+#'   learn = cbind(iris[["Species"]], df)
+#'   svm = e1071::svm(Species ~ ., data=learn)
+#'
+#' @export
+#' 
+num2profile <- function(x, group, width=100, lag=as.integer(width/2)){
+    cols = colnames(x)
+    tmp = by(x,
+       INDICES=list(group),
+       FUN=function(g){
+           if(nrow(g) == 1){
+               g[,cols] = 0
+           }else{
+               as.data.frame(lapply(g[,cols], function(x){
+                   m = zoo::rollapplyr(x, width, mean, fill=NA)
+                   s = zoo::rollapplyr(x, width, sd, fill=NA)
+                   mi = zoo::rollapplyr(x, width, min, fill=NA)
+                   ma = zoo::rollapplyr(x, width, max, fill=NA)
+                   n = cumsum(x)
+                   r = lag(n, lag)
+                   ndi = (n-r) / (n+r)
+                   mima = (x-mi)/(ma-mi)
+                   z = (x-m)/s
+                   data.frame(z=z, mima=mima, ndi=ndi)
+               }))
+           }
+       })
+    do.call(rbind, tmp)
+}
+
+
 #' Extract time related features
 #'
 #' @param x A vector with timestamps of type POSIXct
@@ -1225,3 +1553,158 @@ tfeat <- function(x, width){
 }
 
 
+
+##
+    ## NBTree
+    ##
+    ## - Decision tree-based paritioning of the data (unbalanced)
+    ## - No interaction data (needed)
+    ## - Data subsets at each leaf node is a Naive Bayes Classifer
+    ## - Prediction:
+    ##     if DT == 0 -> 0
+    ##     if NB == 1 -> 1
+    ##     else       -> 0
+    ##
+    ## i = 5
+    ## .ym = ym[i]
+    ## y = data[[id_y]]
+    ## i0 = which(ymx == ym[i] & y == 0)
+    ## i1 = which(ymx <= ym[i] & y == 1)
+    ## id_learn = c(i0, i1)
+    ## LEARN = data[id_learn,]
+
+data2nbtree <- function(x, y, ...){
+    f = iop::data2formula(dict, CALIB, varx="xnum")
+    loss = matrix(c(0, 1, 5, 0), ncol=2, byrow=T)
+    library(partykit)
+    dt = rpart::rpart(f, data=LEARN, parms=list(loss=loss, split="information"))
+    fit = fitted(as.party(dt))
+    id_node = fit[,1]
+    nodes = unique(id_node)
+    id_xnum = iop::dict2xnum(dict, CALIB)
+    NBTree = list()
+    tt = table(LEARN[[id_y]])
+    priors = as.numeric(tt/sum(tt))
+    tmp = lapply(nodes, function(node){
+        sel = id_node == node
+        x = data[sel,id_xnum]
+        x[is.na(x)] = 0
+        y = data[[id_y]][sel]
+        NBTree[[node]] <<- fastNaiveBayes::fastNaiveBayes(x=x, y=y, priors=priors)
+    })
+    model = list(nbtree=NBTree)
+    class(model) = c("data2nbtree")
+    return(model)
+}
+
+
+    ## y = data[[id_y]]
+    ## i0 = which(ymx == ym[i+1] & y == 0)
+    ## i1 = which(ymx <= ym[i+1] & y == 1)
+    ## n0 = length(i1)
+    ## id_eval = c(sample(i0, n0), i1)
+    ## EVAL = data[id_eval,]
+    ## dim(EVAL)
+
+predict.data2nbtree <- function(model, newx, ...){
+    library(fastNaiveBayes)
+    p_node = predict(as.party(dt), newdata=EVAL[,id_xnum], type="node")
+    p_nb = rep(NA,length(p_node))
+    p_nb = list()
+    p_nb[nodes] = lapply(nodes, function(node){
+        predict(NBTree[[node]], newdata=EVAL[,id_xnum], type="class")
+    })
+    p_dt = as.character(predict(dt, newdata=EVAL[,id_xnum], type="class"))
+    p_nbtree = as.character(sapply(1:length(p_node), function(i){
+        p_nb[[p_node[i]]][i]
+    }))
+    p = ifelse(p_dt == 0, p_dt, ifelse(p_nbtree == 1, p_nbtree, 0))
+    return(p)
+}
+
+
+#' Feature selection using the wrapper method
+#'
+#' @param
+#'   x : data.frame with continuous variables
+#'
+#' @param
+#'   y = vector with binary class labels: {0, 1}
+#'
+#' @return
+#'   num2sel object
+#'
+#' @examples
+#'   x = iris[1:100,1:4]
+#'   y = ifelse(iris[1:100, 5] == "setosa", 1, 0)
+#'   m = num2sel(x, y)
+#'   newx = predict(m, x)
+#' 
+#' @export
+#' 
+num2sel <- function(x, y, run=10){
+    ## fitness function
+    fit <- function(vars, x, y){
+        i0 = which(y == 0)
+        i1 = which(y == 1)
+        r0 = sample(i0, as.integer(length(i0)/2))
+        r1 = sample(i1, as.integer(length(i1)/2))
+        id_learn = c(r0, r1)
+        id_eval = -c(r0, r1)
+        svm = LiblineaR::LiblineaR(data=x[id_learn,vars],target=y[id_learn])
+        p = predict(svm, newx=x[id_eval,vars])$predictions
+        a = y[id_eval]
+        conf = as.matrix(table(p,a))
+        TP = conf[2,2]
+        FP = conf[2,1]
+        FN = conf[1,2]
+        PPV = TP / (TP+FP)
+        REC = TP / (TP+FN)
+        F1 = PPV*REC*2/(REC+PPV)
+        F1
+        F1 / sum(vars)
+    }
+    ## genetics algorithm to search optimal subset of features
+    ga = GA::ga(fitness=function(vars){ fit(vars=vars, x=x, y=y) },
+                type="binary",
+                elitism=3,
+                pmutation=.5,
+                popSize=10,
+                nBits=ncol(x),
+                names=colnames(x),
+                run=run,
+                maxiter=10,
+                monitor=plot,
+                keepBest=T,
+                parallel=F,
+                seed=84211)
+    sel = which(as.integer(ga@bestSol[[run]]) == 1)
+    cols = colnames(x)[sel]
+    model = list(cols=cols)
+    class(model) = c("num2sel")
+    return(model)
+}
+
+#' Feature selection using the wrapper method
+#' 
+#' @param
+#'   model : num2sel object
+#'
+#' @param
+#'   newx : data.frame
+#'
+#' @examples
+#'   x = iris[1:100,1:4]
+#'   y = ifelse(iris[1:100, 5] == "setosa", 1, 0)
+#'   m = num2sel(x, y)
+#'   newx = predict(m, x)#'
+#' 
+#' @return
+#'   data.frame; the number of columns is reduced
+#' 
+#' @export
+#' 
+predict.num2sel <- function(model, newx, ...){
+    cols = intersect(colnames(newx), names(model$cols))
+    return(newx[,cols])
+}
