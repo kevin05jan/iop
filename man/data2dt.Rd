@@ -12,7 +12,19 @@ data2dt(f, x, ...)
 \item{x}{: data.frame}
 }
 \description{
-Tree-based models and ensembles:  rpart::rpart
+methods to deal with imbalanced data
+(a) prior:  proprotion of 1/0 labels:
+  rpart(..., params=list(prior=c(.5, .5))
+(b) cost/loss: cost sensitive training/loss learning:  employs cost in misclassification learning
+}
+\details{
+TP  FP
+                  FN  TN
+
+loss = matrix(c( 0,  1,
+                  20,  0), ncol=2)
+  rpart(..., params=list(loss=loss))
+ (c) case weight: increase case weight for samples of minority class: applies to observation
 }
 \examples{
   dt = rpart::rpart(f, data=x)

@@ -15,9 +15,11 @@ data2svm(f, x)
 Support Vector Machines:  e1071::svm
 }
 \examples{
+  X = 1:2
+  Y = 5
   iris[["Species"]] = as.factor(iris[["Species"]])
-  svm = e1071::svm(Species ~ ., data=iris)
-  p = predict(svm, newdata=iris)
+  svm = e1071::svm(Species ~ ., data=iris[,c(Y, X)])
+  p = predict(svm, newdata=iris[,X])##--important
   table(p, a=iris[["Species"]])
 
 }
