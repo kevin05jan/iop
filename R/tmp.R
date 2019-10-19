@@ -1,8 +1,4 @@
 
-### TODO
-### dict2xnum : extract based on current variable classes
-### dict2xcat : extract based on current variable classes
-
 
 
 
@@ -502,51 +498,6 @@ predict.num2scale <- function(model, newx, method="scaling"){
     }
 }
 
-#' Log numeric variables
-#' 
-#' @param
-#'   x : data.frame; with numeric variables
-#'
-#' @param
-#'   smooth : numeric; used to add to x before log:  log( x+smooth )
-#' 
-#' @return
-#'   data.frame; number of dimensions may be reduced
-#'
-#' @examples
-#'   xlog = num2log(iris[,1:4])
-#' 
-#' @export
-#' 
-num2log <- function(x, smooth=.001){
-    labs = colnames(x)
-    newx = x
-    newx[,labs] = lapply(labs, function(i) log(newx[[i]]+smooth) )
-    colnames(newx) = paste0(colnames(newx), ".log")
-    return(newx)
-}
-
-
-#' Square numeric variables
-#' 
-#' @param
-#'   x : data.frame; with numeric variables
-#'
-#' @return
-#'   data.frame; number of dimensions may be reduced
-#'
-#' @examples
-#'   xsq = num2sq(iris[,1:4])
-#' 
-#' @export
-#' 
-num2sq <- function(x){
-    labs = colnames(x)
-    newx = x
-    newx[,labs] = lapply(labs, function(i) newx[[i]]*newx[[i]] )
-    colnames(newx) = paste0(colnames(newx), ".sq")
-    return(newx)
-}
 
 
         
@@ -647,6 +598,54 @@ predict.data2dict <- function(model, newx, ...){
     ##--TODO:  cast Y
     return(newx)
 }
+
+
+
+
+#' Extract numerical variables on the basis of the current data.frame
+#'
+#' @param
+#'   x : data.frame
+#'
+#' @param
+#'   model : dictionary
+#'
+#' @return
+#'   vector with numerical variable names
+#'
+#' @export
+#' 
+data2xnum <- function(x, model){
+    labs = colnames(x)
+    s = sapply(labs, function(i)is.numeric(x[[i]]))
+    id_xnum = labs[s]
+    id_y = dict2y(model, x)
+    id_xnum = id_xnum[!id_xnum %in% id_y]
+}
+
+
+#' Extract categorical variables on the basis of the current data.frame
+#'
+#' @param
+#'   x : data.frame
+#'
+#' @param
+#'   model : dictionary
+#'
+#' @return
+#'   vector with categorical variable names
+#' 
+#' @export
+#' 
+data2xcat <- function(x, model){
+    labs = colnames(x)
+    s = sapply(labs, function(i)is.character(x[[i]]))
+    id_xcat = labs[s]
+    id_y = dict2y(model, x)
+    id_xcat = id_xcat[!id_xcat %in% id_y]
+}
+
+
 
 #' Extract x variables
 #'
@@ -1111,7 +1110,7 @@ nzv2rm <- function(x, ratio=.5, thresh=.05){
                      )
     })
     lut = na.omit(cols[nzv < thresh])
-    model = list(lut=lut)
+    model = list(lut=lut, nzv=nzv)
     class(model) = c("nzv2rm")
     return(model)
 }
@@ -1163,7 +1162,7 @@ cor2rm <- function(x, thresh=.95){
     tmp = cor(x[,cols], use="complete.obs")
     tmp[upper.tri(tmp)] = 0
     diag(tmp) = 0
-    lut = cols[apply(tmp, 2, function(xx){ any(xx > thresh) })]
+    lut = cols[apply(tmp, 2, function(xx){ any(abs(xx) > thresh) })]
     model = list(lut=lut, thresh=thresh, cormat=tmp, cols=cols)
     class(model) = c("cor2rm")
     return(model)
@@ -1191,6 +1190,51 @@ predict.cor2rm <- function(model, newx){
     return(newx)
 }
 
+#' Identify which numericcal variables needs to be log
+#' The decision is based on the measurement of their skewness
+#'
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @return
+#'   num2log object
+#' 
+#' @export
+#' 
+num2log <- function(x, thresh=1){
+    labs = colnames(x)
+    s = sapply(labs, function(i){
+        e1071::skewness(x[[i]], na.rm=T)
+    })
+    sel = labs[s >= 1]
+    model = list(sel=sel, skewness=s, name=labs)
+    class(model) = c("num2log")
+    return(model)
+}
+
+#' Identify which numericcal variables needs to be log
+#' The decision is based on the measurement of their skewness
+#'
+#' @param
+#'   model : num2log object
+#'
+#' @param
+#'   newx : data.frame with numerical variables
+#'
+#' @param
+#'   smooth : double;  value is added to numerical variable before log:  log(newx[[i]] + smooth)
+#' 
+#' @return
+#'   data.frame; number of dimensions may be reduced
+#' 
+#' @export
+#' 
+predict.num2log <- function(model, newx, smooth=.001){
+    labs = intersect(colnames(newx), model$sel)
+    newx[,!colnames(newx) %in% labs] = NULL
+    newx[labs] = lapply(labs, function(i) log(newx[[i]] + smooth) )
+    newx
+}
 
 
 
@@ -1300,20 +1344,23 @@ predict.num2gasvm <- function(model, newx, ...){
 #'   ntree : integer;  number of trees
 #'
 #' @return
-#'   num2rf object
+#'   num2imp object
 #'
 #' @examples
-#'   m = num2rf(Species ~ ., iris)
+#'   m = num2imp(Species ~ ., iris)
 #'   dat = predict(m, iris)
 #' 
 #' @export
 #' 
-num2rf <- function(f, x, thresh=5, ntree=10){
-    rf = randomForest::randomForest(f, data=x, ntree=10)
+num2imp <- function(x, y, thresh=.5, ntree=10){
+    rf = randomForest::randomForest(x, y, ntree=10)
     labs = rownames(rf$importance)
-    sel = labs[rf$importance >= thresh]
-    model = list(sel=sel)
-    class(model) = c("num2rf")
+    imp = rf$importance
+    imp = (imp-min(imp))/diff(range(imp))
+    name = row.names(imp)
+    sel = labs[imp >= thresh]
+    model = list(sel=sel, imp=imp, name=name, thresh=thresh, rf=rf)
+    class(model) = c("num2imp")
     return(model)
 }
 
@@ -1322,7 +1369,7 @@ num2rf <- function(f, x, thresh=5, ntree=10){
 #' Features are selected on the basis of variable$importance
 #'
 #' @param
-#'   model : num2rf object
+#'   model : num2imp object
 #'
 #' @param
 #'   newx : data.frame with numerical variables
@@ -1331,21 +1378,22 @@ num2rf <- function(f, x, thresh=5, ntree=10){
 #'   data.frame dimension may be reduced
 #'
 #' @examples
-#'   m = num2rf(Species ~ ., iris)
+#'   m = num2imp(Species ~ ., iris)
 #'   dat = predict(m, iris)
 #' 
 #' @export
-predict.num2rf <- function(model, newx){
+#' 
+predict.num2imp <- function(model, newx){
     newx[,model$sel]
 }
 
 
 
-num2sel <- function(x, method="randomforest", ...){
+num2sel <- function(x, y, method="randomforest", ...){
     methods = c("RF", "GASVM")
     choice = methods[pmatch(method, methods)]
     switch(choice,
-           RF = { return(num2rf(x, ...)) },
+           RF = { return(num2imp(x, y, ...)) },
            GASVM = { return(num2gasvm(x, ...)) }
            )
     return(NULL)
@@ -1455,6 +1503,337 @@ num2int <- function(x, t=NULL){
         return(as.data.frame(newx, col.names=name))
     }
     return(NULL)
+}
+
+#' Feature interaction:  f1 + f2
+#' 
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @param
+#'   y : vector with class label
+#'
+#' @param
+#'   thresh : numerical;  selects variables with importance >= thresh
+#' 
+#' @param
+#'   ntree : integer;  number of trees
+#'
+#' @return
+#'   num2sum object
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2sum(df[,1:4], df[,5])
+#'   xsum = predict(m, df[,1:4]
+#'   data = cbind(df, xsum)
+#' 
+#' @export
+#' 
+num2sum <- function(x, y=NULL, thresh=.5, ntree=10){
+    labs = colnames(x)
+    comb = expand.grid(labs, labs)
+    combs = 1:nrow(comb)
+    int = list()
+    int[combs] = lapply(combs, function(i){
+        a = comb[i,1]
+        b = comb[i,2]
+        x[[a]] + x[[b]]
+    })
+    infix = "_add_"
+    name = paste0(comb[,1], infix, comb[,2])
+    df = as.data.frame(int, col.names=name)
+    if(is.null(y)){
+        model = list(sel=name, imp=NULL, infix=infix, name=name, thresh=NULL, ntree=NULL, out=df)
+    }else{
+        m = num2imp(df, y, thresh, ntree)
+        model = list(sel=m$sel, imp=m$imp, infix=infix, name=m$name, thresh=thresh, ntree=ntree, out=NULL)
+    }
+    class(model) = c("num2sum")
+    return(model)
+}
+
+
+#' Feature interaction:  f1 + f2
+#' 
+#' @param
+#'   model : num2sum object
+#'
+#' @param
+#'   newx : data.frame with numerical variables
+#'
+#' @return
+#'   data.frame with most important interacting features
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2sum(df[,1:4], df[,5])
+#'   xsum = predict(m, df[,1:4]
+#'   data = cbind(df, xsum)
+#' 
+#' @export
+#' 
+predict.num2sum <- function(model, newx){
+    int = list()
+    int[model$sel] = lapply(model$sel, function(i){
+        a = strsplit(i, model$infix)[[1]][1]
+        b = strsplit(i, model$infix)[[1]][2]
+        newx[[a]] + newx[[b]]
+    })
+    df = as.data.frame(int, col.names=model$sel)
+    return(df)
+}
+
+#' Feature interaction:  f1 * f2
+#' 
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @param
+#'   y : vector with class label
+#'
+#' @param
+#'   thresh : numerical;  selects variables with importance >= thresh
+#' 
+#' @param
+#'   ntree : integer;  number of trees
+#'
+#' @return
+#'   num2dot object
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2dot(df[,1:4], df[,5])
+#'   xdot = predict(m, df[,1:4]
+#'   data = cbind(df, xdot)
+#' 
+#' @export
+#' 
+num2dot <- function(x, y=NULL, thresh=.5, ntree=10){
+    labs = colnames(x)
+    comb = expand.grid(labs, labs)
+    combs = 1:nrow(comb)
+    int = list()
+    int[combs] = lapply(combs, function(i){
+        a = comb[i,1]
+        b = comb[i,2]
+        x[[a]] * x[[b]]
+    })
+    infix = "_dot_"
+    name = paste0(comb[,1], infix, comb[,2])
+    df = as.data.frame(int, col.names=name)
+    if(is.null(y)){
+        model = list(sel=name, imp=NULL, infix=infix, name=name, thresh=NULL, ntree=NULL, out=df)
+        
+    }else{
+        m = num2imp(df, y, thresh, ntree)
+        model = list(sel=m$sel, imp=m$imp, infix=infix, name=m$name, thresh=thresh, ntree=ntree)
+    }
+    class(model) = c("num2dot")
+    return(model)
+}
+
+
+#' Feature interaction:  f1 * f2
+#' 
+#' @param
+#'   model : num2dot object
+#'
+#' @param
+#'   newx : data.frame with numerical variables
+#'
+#' @return
+#'   data.frame with most important interacting features
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2dot(df[,1:4], df[,5])
+#'   xdot = predict(m, df[,1:4]
+#'   data = cbind(df, xdot)
+#' 
+#' @export
+#' 
+predict.num2dot <- function(model, newx){
+    int = list()
+    int[model$sel] = lapply(model$sel, function(i){
+        a = strsplit(i, model$infix)[[1]][1]
+        b = strsplit(i, model$infix)[[1]][2]
+        newx[[a]] * newx[[b]]
+    })
+    df = as.data.frame(int, col.names=model$sel)
+    return(df)
+}
+
+
+#' Feature interaction:  f1 - f2
+#' 
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @param
+#'   y : vector with class label
+#'
+#' @param
+#'   thresh : numerical;  selects variables with importance >= thresh
+#' 
+#' @param
+#'   ntree : integer;  number of trees
+#'
+#' @return
+#'   num2dif object
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2dif(df[,1:4], df[,5])
+#'   xdif = predict(m, df[,1:4]
+#'   data = cbind(df, xdif)
+#' 
+#' @export
+#' 
+num2dif <- function(x, y=NULL, thresh=.5, ntree=10){
+    labs = colnames(x)
+    comb = combn(labs, m=2)
+    combs = 1:ncol(comb)
+    int = list()
+    int[combs] = lapply(combs, function(i){
+        a = comb[1,i]
+        b = comb[2,i]
+        x[[a]] - x[[b]]
+    })
+    infix = "_dif_"
+    name = sapply(combs, function(i){
+        paste0(comb[1,i], infix, comb[2,i])
+    })
+    df = as.data.frame(int, col.names=name)
+    if(is.null(y)){
+        model = list(sel=name, imp=NULL, infix=infix, name=name, thresh=NULL, ntree=NULL, out=df)        
+    }else{
+        m = num2imp(df, y, thresh, ntree)
+        model = list(sel=m$sel, imp=m$imp, infix=infix, name=m$name, thresh=thresh, ntree=ntree)
+    }
+    class(model) = c("num2dif")
+    return(model)
+}
+
+#' Feature interaction:  f1 - f2
+#' 
+#' @param
+#'   model : num2dif object
+#'
+#' @param
+#'   newx : data.frame with numerical variables
+#'
+#' @return
+#'   data.frame with most important interacting features
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2dif(df[,1:4], df[,5])
+#'   xdif = predict(m, df[,1:4]
+#'   data = cbind(df, xdif)
+#' 
+#' @export
+#' 
+predict.num2dif <- function(model, newx){
+    int = list()
+    int[model$sel] = lapply(model$sel, function(i){
+        a = strsplit(i, model$infix)[[1]][1]
+        b = strsplit(i, model$infix)[[1]][2]
+        newx[[a]] - newx[[b]]
+    })
+    df = as.data.frame(int, col.names=model$sel)
+    return(df)
+}
+
+
+
+
+#' Feature interaction:  f1 / f2
+#' 
+#' @param
+#'   x : data.frame with numerical variables
+#'
+#' @param
+#'   y : vector with class label
+#'
+#' @param
+#'   thresh : numerical;  selects variables with importance >= thresh
+#' 
+#' @param
+#'   ntree : integer;  number of trees
+#'
+#' @return
+#'   num2div object
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2div(df[,1:4], df[,5])
+#'   xdiv = predict(m, df[,1:4]
+#'   data = cbind(df, xdiv)
+#' 
+#' @export
+#' 
+num2div <- function(x, y=NULL, thresh=.5, ntree=10, smooth=.001){
+    labs = colnames(x)
+    comb = combn(labs, m=2)
+    combs = 1:ncol(comb)
+    int = list()
+    int[combs] = lapply(combs, function(i){
+        a = comb[1,i]
+        b = comb[2,i]
+        (x[[a]] + smooth) / (x[[b]] + smooth)
+    })
+    infix = "_div_"
+    name = sapply(combs, function(i){
+        paste0(comb[1,i], infix, comb[2,i])
+    })
+    df = as.data.frame(int, col.names=name)
+    if(is.null(y)){
+        model = list(sel=name, imp=NULL, infix=infix, name=name, thresh=NULL, ntree=NULL, out=df)
+    }else{
+        m = num2imp(df, y, thresh, ntree)
+        model = list(sel=m$sel, imp=m$imp, infix=infix, name=m$name, thresh=thresh, ntree=ntree)
+    }
+    class(model) = c("num2div")
+    return(model)
+}
+
+#' Feature interaction:  f1 / f2
+#' 
+#' @param
+#'   model : num2div object
+#'
+#' @param
+#'   newx : data.frame with numerical variables
+#'
+#' @return
+#'   data.frame with most important interacting features
+#'
+#' @examples
+#'   df = iris[1:100,]
+#'   df$Species = as.factor(ifelse(df$Species == "setosa", 1, 0))
+#'   m = num2div(df[,1:4], df[,5])
+#'   xdiv = predict(m, df[,1:4]
+#'   data = cbind(df, xdiv)
+#' 
+#' @export
+#' 
+predict.num2div <- function(model, newx, smooth=.001){
+    int = list()
+    int[model$sel] = lapply(model$sel, function(i){
+        a = strsplit(i, model$infix)[[1]][1]
+        b = strsplit(i, model$infix)[[1]][2]
+        (newx[[a]] + smooth) / (newx[[b]] + smooth)
+    })
+    df = as.data.frame(int, col.names=model$sel)
+    return(df)
 }
 
 
@@ -1880,16 +2259,16 @@ nbtree <- function(x, y, loss = matrix(c(0, 1, 5, 0), ncol=2, byrow=TRUE)){
     fit = fitted(as.party(dt))
     id_node = fit[,1]
     nodes = unique(id_node)
-    NBTree = list()
+    nbtree = list()
     priors = as.numeric(table(y)/length(y))
     tmp = lapply(nodes, function(node){
         sel = id_node == node
-        xx = data[sel,]
-        x[is.na(x)] = 0
-        yy = data[sel, "y"]
-        NBTree[[node]] <<- fastNaiveBayes::fastNaiveBayes(x=xx, y=yy, priors=priors)
+        xx = x[sel,]
+        xx[is.na(xx)] = 0
+        yy = y[sel]
+        nbtree[[node]] <<- fastNaiveBayes::fastNaiveBayes(x=xx, y=yy, priors=priors)
     })
-    model = list(dt=dt, nbtree=NBTree)
+    model = list(dt=dt, nbtree=nbtree, nodes=nodes)
     class(model) = c("nbtree")
     return(model)
 }
@@ -1915,17 +2294,18 @@ nbtree <- function(x, y, loss = matrix(c(0, 1, 5, 0), ncol=2, byrow=TRUE)){
 #' 
 #' @export
 #' 
-predict.nbtree <- function(model, newx, ...){
+predict.nbtree <- function(model, newx, na.action=0, ...){
+    p_dt = as.numeric(as.character(predict(model$dt, newdata=newx, type="class")))
     library(fastNaiveBayes)
     p_node = predict(as.party(model$dt), newdata=newx, type="node")
-    p_nb = rep(NA,length(p_node))
     p_nb = list()
-    p_nb[nodes] = lapply(nodes, function(node){
-        predict(NBTree[[node]], newdata=EVAL[,id_xnum], type="class")
+    p_nb[model$nodes] = lapply(model$nodes, function(node){
+        predict(model$nbtree[[node]], newdata=newx, type="class")
     })
-    p_nbtree = as.character(sapply(1:length(p_node), function(i){
+    p_nbtree = as.numeric(as.character(sapply(1:length(p_node), function(i){
         p_nb[[p_node[i]]][i]
-    }))
+    })))
+    p_nbtree[is.na(p_nbtree)] = na.action
     p = ifelse(p_dt == 0, p_dt, ifelse(p_nbtree == 1, p_nbtree, 0))
     return(p)
 }
@@ -1984,7 +2364,7 @@ rssvm <- function(x, y, iter=100, nsvm=10){
     })
     ## eval
     perf = rep(0, iter)
-    pref[iters] = sapply(iters, function(i){
+    perf[iters] = sapply(iters, function(i){
         p = predict(svms[[i]], newx=x)$predictions
         cm(p,y)$PPV
     })
@@ -1999,18 +2379,20 @@ rssvm <- function(x, y, iter=100, nsvm=10){
     return(model)
 }
 
-
+#' @export
+#' 
 cm <- function(p,a){
-    p = as.numeric(as.character(p))
-    a = as.numeric(as.character(a))
-    TP = sum(p == a & a == 1)
-    TN = sum(p == a & a == 0)
-    FP = sum(p != a & p == 1)
-    FN = sum(p != a & p == 0)
+    pp = as.numeric(as.character(p))
+    aa = as.numeric(as.character(a))
+    TP = sum(pp == aa & aa == 1)
+    TN = sum(pp == aa & aa == 0)
+    FP = sum(pp != aa & pp == 1)
+    FN = sum(pp != aa & pp == 0)
     PPV = TP/(TP+FP)
     REC = TP/(TP+FN)
     F1 = PPV*REC*2/(REC+PPV)
-    list(TP=TP, TN=TN, FP=FP, FN=FN, PPV=PPV, REC=REC, F1=F1)
+    CM = matrix(c(TN, FN, FP, TP), ncol=2, byrow=TRUE, dimnames=list(P=c("N", "P"), A=c("N", "P")))
+    list(TP=TP, TN=TN, FP=FP, FN=FN, PPV=PPV, REC=REC, F1=F1, CM=CM)
 }
 
 #' Building an ensemble of SVM classifiers using random sampling
@@ -2046,8 +2428,9 @@ predict.rsvm <- function(model, newx, thresh=.5){
     ifelse(apply(mat, 1, sum)/model$nsvm >= thresh, 1, 0)
 }
 
-## kmsvm /
 
+#' K means clustering based SVM
+#' 
 #' @export
 #' 
 kmsvm <- function(x, y, centers){

@@ -1,0 +1,192 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+devtools::document()
+devtools::build()
+devtools::install()
+```
+
+
+
+
+
+```{r}
+data = readRDS("../ieee-fraud-detection/train_transaction.rds")
+dict = iop::data2dict(file="../ieee-fraud-detection/dict.csv")
+##data = predict(dict, data)
+dim(data)
+
+```
+
+```{r}
+
+id_y = iop::dict2y(dict, data)
+time = data[["TransactionDT"]]
+ymd = as.POSIXct(as.Date(as.POSIXct(time, origin = "2019-01-01")))
+ymx = (format(ymd, format="%Y-%m"))
+data[[id_y]] = as.factor(as.character(data[[id_y]]))
+
+table(ymx, data[[id_y]])
+ym = unique(ymx)
+
+## subsetting
+## [ i-1 ] [  i  ] [ i+1 ]
+##         [calib]
+## [-------train---------]
+## [----learn----] [eval ]
+i = 5
+.ym = ym[i]
+y = data[[id_y]]
+i0 = which(ymx == ym[i] & y == 0)
+i1 = which(ymx <= ym[i] & y == 1)
+id_calib = c(i0, i1)
+CALIB = data[id_calib,]
+dim(CALIB)
+
+length(i0)
+length(i1)
+
+## calibrating
+.na2rm = iop::na2rm(CALIB)
+CALIB = predict(.na2rm, CALIB)
+.const2rm = iop::const2rm(CALIB)
+CALIB = predict(.const2rm, CALIB)
+id_xnum = iop::dict2xnum(dict, CALIB)
+.nzv2rm = iop::nzv2rm(CALIB[,id_xnum])
+CALIB = predict(.nzv2rm, CALIB)
+id_xnum = iop::dict2xnum(dict, CALIB)
+.cor2rm = iop::cor2rm(CALIB[,id_xnum])
+CALIB = predict(.cor2rm, CALIB)
+id_xnum = iop::dict2xnum(dict, CALIB)
+.num2log = iop::num2log(CALIB[,id_xnum])
+
+
+
+sel = complete.cases(CALIB[,c(id_xnum, id_y)])
+.num2imp = iop::num2imp(CALIB[sel,id_xnum], CALIB[sel,id_y])
+.num2imp$sel
+
+.num2sum = iop::num2sum(CALIB[sel,.num2imp$sel], CALIB[sel, id_y])
+.num2dot = iop::num2dot(CALIB[sel,.num2imp$sel], CALIB[sel, id_y])
+.num2dif = iop::num2dif(CALIB[sel,.num2imp$sel], CALIB[sel, id_y])
+.num2div = iop::num2div(CALIB[sel,.num2imp$sel], CALIB[sel, id_y])
+
+
+dim(CALIB)
+
+```
+
+### Benchmark
+```{r}
+id_xnum = iop::dict2xnum(dict, CALIB)
+LEARN = CALIB[, c(id_y, id_xnum)]
+sel = complete.cases(LEARN)
+LEARN = LEARN[sel,]
+.num2scale = iop::num2scale(LEARN[,id_xnum])
+LEARN = predict(.num2scale, LEARN)
+
+i = 5
+.ym = ym[i]
+y = data[[id_y]]
+id_eval = which(ymx > ym[i])
+EVAL = data[id_eval, c(id_y, id_xnum)]
+sel = complete.cases(EVAL)
+EVAL = EVAL[sel,]
+#EVAL = predict(.num2scale, EVAL)
+a = EVAL[[id_y]]
+
+
+
+svm = LiblineaR::LiblineaR(LEARN[,id_xnum], LEARN[[id_y]])
+p = predict(svm, newx=EVAL)$predictions
+svm.cm = iop::cm(p,a)
+svm.cm
+
+nb = fastNaiveBayes::fastNaiveBayes(LEARN[,id_xnum], LEARN[[id_y]])
+p = predict(nb, newdata= EVAL[,id_xnum])
+nb.cm = iop::cm(p,a)
+nb.cm
+
+dt = rpart::rpart(isFraud ~ ., data=LEARN)
+p = predict(dt, newdata=EVAL, type="class")
+dt.cm = iop::cm(p,a)
+dt.cm
+
+rf = randomForest::randomForest(isFraud ~ ., data=LEARN)
+p = predict(rf, newdata=EVAL, type="class")
+rf.cm = iop::cm(p,a)
+rf.cm
+```
+```{r}
+
+dt = rpart::rpart(isFraud ~ ., data=LEARN)
+
+p = predict(dt, newdata=EVAL, type="class")
+dt.cm = iop::cm(p,a)
+dt.cm
+```
+
+```{r}
+
+numlog = predict(.num2log, CALIB)
+
+id_xnum = iop::dict2xnum(dict, CALIB)
+sel = complete.cases(CALIB[,c(id_y, id_xnum)])
+CALIB = CALIB[sel,]
+dim(CALIB)
+
+.num2scale = iop::num2scale(CALIB[,id_xnum])
+CALIB = predict(.num2scale, CALIB)
+
+x = CALIB[,id_xnum]
+y = CALIB[[id_y]]
+
+i0 = which(y == 0)
+i1 = which(y == 1)
+n0 = as.integer(length(i0)/2)
+n1 = length(i1)
+nx = as.integer(sqrt(ncol(x)))
+
+iter = 100
+iters = 1:iter
+svms = list()
+svms[iters] = lapply(iters, function(i){
+  r0 = sample(i0, n0)
+  r1 = sample(i1, n1)
+  rx = sample(id_xnum, nx)
+  learn = c(r0, r1)
+  #LiblineaR::LiblineaR(x[learn, rx], y[learn])
+  e1071::svm(x=x[learn, rx], y=y[learn], kernel="linear", type="C-classification")
+})
+
+perf = rep(0, iter)
+perf[iters] = sapply(iters, function(i){
+  p = predict(svms[[i]], newdata=x, type="class")
+  iop::cm(p,y)$PPV
+})
+```
+
+
+
+
+```{r}
+label = factor(ifelse(ymx<= ym[i], "train", "test"), levels = c("train", "test"))
+df = data.frame(ymx, label, isFraud=data[[id_y]])
+head(df, 1000000) %>%
+ggplot(aes(ymx, fill=isFraud)) + geom_bar() + facet_wrap(~label, ncol=2, scale="free_x")
+```
+
+
+
+
+
+
+
+
+
+

@@ -4,7 +4,7 @@
 \alias{predict.nbtree}
 \title{NBTree}
 \usage{
-\method{predict}{nbtree}(model, newx, ...)
+\method{predict}{nbtree}(model, newx, na.action = 0, ...)
 }
 \arguments{
 \item{x}{: data.frame with numeric variables}
